@@ -335,11 +335,15 @@ def clean_response(text: Optional[str], verified_claims: List[VerifiedClaim]) ->
 
 
 def compute_trust_score(claims_checked: int, claims_grounded: int) -> Dict[str, Any]:
-    """Compute trust score stats based on checked vs grounded claims."""
+    """Compute trust score statistics based on checked vs grounded claims.
+
+    Formula: verified / checked
+    """
     checked = max(0, claims_checked)
     grounded = max(0, claims_grounded)
     rejected = max(0, checked - grounded)
     score = round(grounded / checked, 2) if checked > 0 else 1.0
+
     return {
         "claims_checked": checked,
         "claims_grounded": grounded,
@@ -349,21 +353,63 @@ def compute_trust_score(claims_checked: int, claims_grounded: int) -> Dict[str, 
 
 
 def verify(response_text: Optional[str], payload: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-    """Master API function for response verification."""
-    claims = extract_claims(response_text)
-    verified_results = verify_claims(claims, payload)
-    grounded_count = sum(1 for v in verified_results if v.verified)
-    rejected_count = sum(1 for v in verified_results if not v.verified)
-    stats = compute_trust_score(len(verified_results), grounded_count)
-    cleaned = clean_response(response_text, verified_results)
-    rejected_claims_text = [v.claim.original_sentence for v in verified_results if not v.verified]
+    """Master API function for deterministic response verification.
 
-    result = GuardrailResult(
-        clean_text=cleaned,
-        claims_checked=stats["claims_checked"],
-        claims_grounded=stats["claims_grounded"],
-        claims_rejected=stats["claims_rejected"],
-        trust_score=stats["trust_score"],
-        rejected_claims=rejected_claims_text,
-    )
-    return result.to_dict()
+    Input:
+        response_text: Raw response string from Gemma LLM.
+        payload: Structured Earth Engine risk indicators payload.
+
+    Output:
+        {
+            "clean_text": str,
+            "claims_checked": int,
+            "claims_grounded": int,
+            "claims_rejected": int,
+            "trust_score": float,
+            "rejected_claims": list[str]
+        }
+    """
+    try:
+        if not response_text or not isinstance(response_text, str):
+            return GuardrailResult(
+                clean_text="",
+                claims_checked=0,
+                claims_grounded=0,
+                claims_rejected=0,
+                trust_score=1.0,
+                rejected_claims=[],
+            ).to_dict()
+
+        claims = extract_claims(response_text)
+        verified_results = verify_claims(claims, payload)
+
+        grounded_count = sum(1 for v in verified_results if v.verified)
+        stats = compute_trust_score(len(verified_results), grounded_count)
+        cleaned_text = clean_response(response_text, verified_results)
+
+        rejected_claims_text = [
+            f"{v.claim.text} ({v.reason})" for v in verified_results if not v.verified
+        ]
+
+        result = GuardrailResult(
+            clean_text=cleaned_text,
+            claims_checked=stats["claims_checked"],
+            claims_grounded=stats["claims_grounded"],
+            claims_rejected=stats["claims_rejected"],
+            trust_score=stats["trust_score"],
+            rejected_claims=rejected_claims_text,
+        )
+        return result.to_dict()
+
+    except Exception as exc:
+        # Guarantee guardrail never crashes
+        fallback_text = str(response_text) if response_text else ""
+        return GuardrailResult(
+            clean_text=fallback_text,
+            claims_checked=0,
+            claims_grounded=0,
+            claims_rejected=0,
+            trust_score=0.0,
+            rejected_claims=[f"Verification error: {str(exc)}"],
+        ).to_dict()
+
