@@ -10,19 +10,27 @@ class DomainException(Exception):
         self.detail = detail
         self.status_code = status_code
 
-async def domain_exception_handler(request: Request, exc: DomainException):
+
+async def domain_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    assert isinstance(exc, DomainException)
     return JSONResponse(
         status_code=exc.status_code,
         content={"error": exc.error, "detail": exc.detail},
     )
 
-async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+
+async def http_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    assert isinstance(exc, StarletteHTTPException)
     return JSONResponse(
         status_code=exc.status_code,
         content={"error": "HTTP Exception", "detail": str(exc.detail)},
     )
 
-async def validation_exception_handler(request: Request, exc: RequestValidationError):
+
+async def validation_exception_handler(
+    request: Request, exc: Exception
+) -> JSONResponse:
+    assert isinstance(exc, RequestValidationError)
     return JSONResponse(
         status_code=422,
         content={"error": "Validation Error", "detail": str(exc.errors())},

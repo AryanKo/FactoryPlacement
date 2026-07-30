@@ -31,10 +31,10 @@ class GEEClient:
                 ee.Initialize(credentials, **initialize_kwargs)
                 GEEClient._initialized = True
                 logger.info("Successfully initialized real GEE client")
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 logger.error(f"Failed to initialize GEE client: {e!s}")
 
-    def _build_credentials(self):  # noqa: ANN202
+    def _build_credentials(self):
         """Build Earth Engine service account credentials from configured sources."""
         service_account = settings.ee_service_account or None
 
@@ -45,7 +45,9 @@ class GEEClient:
                 key_data=key_json.replace("\\n", "\n"),
             )
 
-        key_ref = (settings.ee_private_key or settings.google_application_credentials).strip()
+        key_ref = (
+            settings.ee_private_key or settings.google_application_credentials
+        ).strip()
         if not key_ref:
             return None
 
@@ -83,7 +85,9 @@ class GEEClient:
         """Return true when a configured key value is intended as a file path."""
         return value.lower().endswith(".json") or "\\" in value or "/" in value
 
-    def _sync_get_all_indicators(self, lat: float, lon: float) -> tuple[float | None, str | None]:
+    def _sync_get_all_indicators(
+        self, lat: float, lon: float
+    ) -> tuple[float | None, str | None]:
         """Blocking call to GEE fetching both surface water trend and flood exposure in one request."""
         point = ee.Geometry.Point([lon, lat])
 
@@ -132,7 +136,7 @@ class GEEClient:
         except asyncio.TimeoutError:
             logger.error(f"GEE query timed out after {timeout} seconds.")
             return None, None
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.error(f"GEE query failed: {e!s}")
             return None, None
 
@@ -189,7 +193,9 @@ class GEEClient:
         return RiskIndicators(
             surface_water_trend=trend_indicator,
             flood_exposure=flood_indicator,
-            rainfall_proxy=IndicatorValue(value=None, source=None, confidence="no_data"),
+            rainfall_proxy=IndicatorValue(
+                value=None, source=None, confidence="no_data"
+            ),
         )
 
     def _get_fallback_indicators(self) -> RiskIndicators:

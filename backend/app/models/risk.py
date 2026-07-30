@@ -17,6 +17,7 @@ class IndicatorValue(BaseModel):
     source: str | None = None
     confidence: Literal["measured", "no_data"]
 
+
 class RiskIndicators(BaseModel):
     surface_water_trend: IndicatorValue
     flood_exposure: IndicatorValue
@@ -24,11 +25,13 @@ class RiskIndicators(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+
 class RiskRequest(BaseModel):
     lat: float = Field(..., ge=-90, le=90)
     lon: float = Field(..., ge=-180, le=180)
 
     model_config = ConfigDict(extra="forbid")
+
 
 class RiskResponse(BaseModel):
     location: Location

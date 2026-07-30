@@ -77,7 +77,9 @@ def test_partially_grounded(sample_payload_flat):
     assert result["claims_rejected"] == 1
     assert result["trust_score"] == 0.67
     assert len(result["rejected_claims"]) == 1
-    assert "~~Rainfall declined by 35%.~~ Removed — Unverifiable" in result["clean_text"]
+    assert (
+        "~~Rainfall declined by 35%.~~ Removed — Unverifiable" in result["clean_text"]
+    )
 
 
 def test_fully_hallucinated(sample_payload_flat):
@@ -180,10 +182,11 @@ def test_mixed_clause_claims(sample_payload_flat):
     assert "Removed — Unverifiable" in result["clean_text"]
 
 
-
 def test_extract_claims_helper():
     """Unit test for extract_claims function."""
-    claims = extract_claims("Surface water declined by 12.4%. Flood exposure is moderate.")
+    claims = extract_claims(
+        "Surface water declined by 12.4%. Flood exposure is moderate."
+    )
     assert len(claims) == 2
     assert claims[0].claim_type == ClaimType.NUMERIC
     assert claims[0].extracted_number == 12.4
@@ -268,6 +271,7 @@ def test_verify_claims_invalid_input():
 
 def test_exception_fallback_in_verify(monkeypatch):
     """Test that verifier errors fail closed without leaking raw output or details."""
+
     def bad_extract_claims(text):
         raise RuntimeError("Unexpected failure")
 
@@ -351,7 +355,7 @@ def test_multiple_numeric_values_are_rejected_as_ambiguous():
 def test_unicode_sentence_boundaries_are_supported(sample_payload_flat):
     """Unicode sentence punctuation should separate adjacent claims."""
     result = verify(
-        "Surface water declined by 12.4%。Flood exposure is moderate！",
+        "Surface water declined by 12.4%。Flood exposure is moderate！",  # noqa: RUF001
         sample_payload_flat,
     )
     assert result["claims_checked"] == 2
@@ -395,7 +399,7 @@ def test_randomized_inputs_are_safe_and_deterministic():
 
 @pytest.mark.parametrize(
     "response",
-    [None, 1, -1, 1.5, [], (), {}, b"bytes", "😀流域—−", "x" * 10000],
+    [None, 1, -1, 1.5, [], (), {}, b"bytes", "😀流域—−", "x" * 10000],  # noqa: RUF001
 )
 def test_untrusted_response_types_do_not_crash(response):
     """The public API must tolerate non-string and oversized response inputs."""

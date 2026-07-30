@@ -2,11 +2,10 @@ from datetime import datetime
 from unittest.mock import patch
 
 import pytest
-from fastapi.testclient import TestClient
-
 from app.core.config import Settings, settings
 from app.main import app
 from app.services.gee_client import GEEClient
+from fastapi.testclient import TestClient
 
 client = TestClient(app)
 
@@ -35,11 +34,11 @@ def test_get_risk_valid():
     response = client.get("/api/risk?lat=37.7749&lon=-122.4194")
     assert response.status_code == 200
     data = response.json()
-    
+
     assert "location" in data
     assert data["location"]["lat"] == 37.7749
     assert data["location"]["lon"] == -122.4194
-    
+
     assert "indicators" in data
     assert "surface_water_trend" in data["indicators"]
     assert "flood_exposure" in data["indicators"]
@@ -80,53 +79,57 @@ def test_get_risk_invalid_params():
     assert "error" in data
     assert data["error"] == "Validation Error"
 
-@patch.object(GEEClient, '_sync_get_all_indicators')
+
+@patch.object(GEEClient, "_sync_get_all_indicators")
 def test_gee_production_success(mock_sync):
     # Setup mock GEE response
     mock_sync.return_value = (5.5, "high")
-    
+
     # Temporarily force production mode
     settings.use_mock_gee = False
     # Mock GEE initialization to bypass credential check
     GEEClient._initialized = True
-    
+
     response = client.get("/api/risk?lat=37.7749&lon=-122.4194")
     assert response.status_code == 200
     data = response.json()
-    
+
     assert data["indicators"]["surface_water_trend"]["value"] == 5.5
     assert data["indicators"]["surface_water_trend"]["confidence"] == "measured"
     assert data["indicators"]["flood_exposure"]["value"] == "high"
     assert data["indicators"]["flood_exposure"]["confidence"] == "measured"
-    
+
     # Restore settings
     settings.use_mock_gee = True
 
-@patch.object(GEEClient, '_sync_get_all_indicators')
+
+@patch.object(GEEClient, "_sync_get_all_indicators")
 def test_gee_production_exception_fallback(mock_sync):
     # Simulate GEE quota error or geometry error
     mock_sync.side_effect = Exception("Earth Engine capacity exceeded")
-    
+
     settings.use_mock_gee = False
     GEEClient._initialized = True
-    
+
     response = client.get("/api/risk?lat=37.7749&lon=-122.4194")
     assert response.status_code == 200
     data = response.json()
-    
+
     # Must fallback to no_data without crashing
     assert data["indicators"]["surface_water_trend"]["value"] is None
     assert data["indicators"]["surface_water_trend"]["confidence"] == "no_data"
     assert data["indicators"]["flood_exposure"]["value"] is None
     assert data["indicators"]["flood_exposure"]["confidence"] == "no_data"
-    
+
     # Restore settings
     settings.use_mock_gee = True
 
 
 def test_settings_load_documented_gee_env_names(monkeypatch):
     monkeypatch.setenv("USE_MOCK_GEE", "true")
-    monkeypatch.setenv("GEE_SERVICE_ACCOUNT_EMAIL", "svc@example.iam.gserviceaccount.com")
+    monkeypatch.setenv(
+        "GEE_SERVICE_ACCOUNT_EMAIL", "svc@example.iam.gserviceaccount.com"
+    )
     monkeypatch.setenv("GEE_SERVICE_ACCOUNT_KEY_PATH", "service-account.json")
     monkeypatch.setenv("GEE_PROJECT_ID", "aquashield-demo")
 
@@ -140,7 +143,9 @@ def test_settings_load_documented_gee_env_names(monkeypatch):
 
 @patch("app.services.gee_client.ee.Initialize")
 @patch("app.services.gee_client.ee.ServiceAccountCredentials")
-def test_gee_initializes_with_documented_key_path(mock_credentials, mock_initialize, tmp_path):
+def test_gee_initializes_with_documented_key_path(
+    mock_credentials, mock_initialize, tmp_path
+):
     key_file = tmp_path / "service-account.json"
     key_file.write_text(
         '{"type":"service_account","client_email":"svc@example.iam.gserviceaccount.com"}',
@@ -169,7 +174,9 @@ def test_gee_initializes_with_documented_key_path(mock_credentials, mock_initial
 
 @patch("app.services.gee_client.ee.Initialize")
 @patch("app.services.gee_client.ee.ServiceAccountCredentials")
-def test_gee_missing_key_path_does_not_initialize(mock_credentials, mock_initialize, tmp_path):
+def test_gee_missing_key_path_does_not_initialize(
+    mock_credentials, mock_initialize, tmp_path
+):
     settings.use_mock_gee = False
     settings.ee_service_account = "svc@example.iam.gserviceaccount.com"
     settings.ee_private_key = str(tmp_path / "missing-service-account.json")
@@ -204,13 +211,13 @@ def test_gee_auth_failure_fallback():
     settings.use_mock_gee = False
     # Simulate uninitialized client (e.g. auth failed during startup)
     GEEClient._initialized = False
-    
+
     response = client.get("/api/risk?lat=37.7749&lon=-122.4194")
     assert response.status_code == 200
     data = response.json()
-    
+
     assert data["indicators"]["surface_water_trend"]["value"] is None
     assert data["indicators"]["surface_water_trend"]["confidence"] == "no_data"
-    
+
     # Restore settings
     settings.use_mock_gee = True

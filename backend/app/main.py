@@ -35,7 +35,7 @@ app.add_exception_handler(RequestValidationError, validation_exception_handler)
 
 
 @app.exception_handler(Exception)
-async def generic_exception_handler(request, exc):  # noqa: ANN001
+async def generic_exception_handler(request, exc):
     return JSONResponse(
         status_code=500,
         content={"error": "Internal Server Error", "detail": str(exc)},

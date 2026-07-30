@@ -28,12 +28,11 @@ verified_data = verify(raw_explanation, payload)
 
 import math
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from app.services.models import Claim, ClaimType, GuardrailResult, VerifiedClaim
 
-
-INDICATOR_ALIASES: Dict[str, List[str]] = {
+INDICATOR_ALIASES: dict[str, list[str]] = {
     "surface_water_trend": [
         "surface water trend",
         "surface water",
@@ -87,20 +86,20 @@ NUMBER_RE = re.compile(
     r"(?:[eE][-+]?\d+)?"
 )
 WHITESPACE_RE = re.compile(r"\s+")
-SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+|(?<=[。！？])\s*|\n+")
+SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+|(?<=[。！？])\s*|\n+")  # noqa: RUF001
 CLAUSE_SPLIT_RE = re.compile(r"\b(?:because|and|while|but|whereas)\b|;", re.IGNORECASE)
-CATEGORY_PATTERNS: Tuple[Tuple[str, re.Pattern[str]], ...] = tuple(
+CATEGORY_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = tuple(
     (category, re.compile(rf"\b{re.escape(category)}\b"))
     for category in sorted(CATEGORICAL_KEYWORDS, key=len, reverse=True)
 )
-SORTED_INDICATOR_ALIASES: Tuple[Tuple[str, Tuple[str, ...]], ...] = tuple(
+SORTED_INDICATOR_ALIASES: tuple[tuple[str, tuple[str, ...]], ...] = tuple(
     (
         canonical_name,
         tuple(sorted((alias.casefold() for alias in aliases), key=len, reverse=True)),
     )
     for canonical_name, aliases in INDICATOR_ALIASES.items()
 )
-INDICATOR_PATTERNS: Tuple[Tuple[str, Tuple[re.Pattern[str], ...]], ...] = tuple(
+INDICATOR_PATTERNS: tuple[tuple[str, tuple[re.Pattern[str], ...]], ...] = tuple(
     (
         canonical_name,
         tuple(
@@ -116,7 +115,9 @@ INDICATOR_PATTERNS: Tuple[Tuple[str, Tuple[re.Pattern[str], ...]], ...] = tuple(
 DECREASE_TERMS = ("declin", "decreas", "drop", "loss", "lost", "reduc", "lower")
 
 
-def match_indicator(claim_or_text: Any, payload_keys: Optional[List[str]] = None) -> Optional[str]:
+def match_indicator(
+    claim_or_text: Any, payload_keys: list[str] | None = None
+) -> str | None:
     """Determine which indicator an extracted claim or text string references.
 
     Supports custom payload keys and extensible alias mappings.
@@ -144,7 +145,7 @@ def match_indicator(claim_or_text: Any, payload_keys: Optional[List[str]] = None
     return None
 
 
-def extract_number_from_text(text: str) -> Optional[float]:
+def extract_number_from_text(text: str) -> float | None:
     """Extract numeric value from text, handling negative numbers and percentages."""
     match = NUMBER_RE.search(text)
     if match:
@@ -155,7 +156,7 @@ def extract_number_from_text(text: str) -> Optional[float]:
     return None
 
 
-def extract_category_from_text(text: str) -> Optional[str]:
+def extract_category_from_text(text: str) -> str | None:
     """Extract categorical risk or status value from text."""
     text_lower = normalize_match_text(text)
     for category, pattern in CATEGORY_PATTERNS:
@@ -181,7 +182,7 @@ def is_negated_category(text: str, category: str) -> bool:
     )
 
 
-def split_sentences(text: str) -> List[str]:
+def split_sentences(text: str) -> list[str]:
     """Split text into sentences cleanly while preserving structure."""
     if not text:
         return []
@@ -189,7 +190,7 @@ def split_sentences(text: str) -> List[str]:
     return [s.strip() for s in raw_sentences if s.strip()]
 
 
-def split_clauses_if_mixed(sentence: str) -> List[str]:
+def split_clauses_if_mixed(sentence: str) -> list[str]:
     """Split sentence into sub-clauses if it contains multiple distinct factual assertions."""
     parts = CLAUSE_SPLIT_RE.split(sentence)
     cleaned_parts = [p.strip() for p in parts if p.strip()]
@@ -197,19 +198,23 @@ def split_clauses_if_mixed(sentence: str) -> List[str]:
     if len(cleaned_parts) > 1:
         indicators = [match_indicator(p) for p in cleaned_parts]
         valid_indicators = [ind for ind in indicators if ind is not None]
-        has_numbers = any(extract_number_from_text(p) is not None for p in cleaned_parts)
-        if len(set(valid_indicators)) > 1 or (len(valid_indicators) >= 1 and has_numbers):
+        has_numbers = any(
+            extract_number_from_text(p) is not None for p in cleaned_parts
+        )
+        if len(set(valid_indicators)) > 1 or (
+            len(valid_indicators) >= 1 and has_numbers
+        ):
             return cleaned_parts
 
     return [sentence]
 
 
-def extract_claims(text: Optional[str]) -> List[Claim]:
+def extract_claims(text: str | None) -> list[Claim]:
     """Extract factual claims (numeric, categorical, mixed) from response text."""
     if not text or not isinstance(text, str):
         return []
 
-    claims: List[Claim] = []
+    claims: list[Claim] = []
     sentences = split_sentences(text)
 
     for sentence in sentences:
@@ -245,7 +250,9 @@ def extract_claims(text: Optional[str]) -> List[Claim]:
     return claims
 
 
-def get_indicator_payload_entry(payload: Any, indicator_key: Optional[str]) -> tuple[bool, Any]:
+def get_indicator_payload_entry(
+    payload: Any, indicator_key: str | None
+) -> tuple[bool, Any]:
     """Retrieve value for an indicator from flat or nested payload."""
     if not isinstance(payload, dict) or not indicator_key:
         return False, None
@@ -271,7 +278,7 @@ def get_indicator_payload_entry(payload: Any, indicator_key: Optional[str]) -> t
     return False, None
 
 
-def get_indicator_payload(payload: Any) -> Optional[Dict[str, Any]]:
+def get_indicator_payload(payload: Any) -> dict[str, Any] | None:
     """Return the dictionary that contains indicator values, if present."""
     if not isinstance(payload, dict):
         return None
@@ -294,13 +301,13 @@ def normalize_payload_key(key: Any) -> str:
     return WHITESPACE_RE.sub("_", str(key).casefold().strip())
 
 
-def build_payload_index(payload: Optional[Dict[str, Any]]) -> Dict[str, tuple[str, Any]]:
+def build_payload_index(payload: dict[str, Any] | None) -> dict[str, tuple[str, Any]]:
     """Build normalized indicator lookup entries once per verification run."""
     search_dict = get_indicator_payload(payload)
     if search_dict is None:
         return {}
 
-    index: Dict[str, tuple[str, Any]] = {}
+    index: dict[str, tuple[str, Any]] = {}
     for key, value in search_dict.items():
         index[normalize_payload_key(key)] = (str(key), unwrap_payload_value(value))
 
@@ -308,13 +315,15 @@ def build_payload_index(payload: Optional[Dict[str, Any]]) -> Dict[str, tuple[st
         for alias in aliases:
             normalized_alias = normalize_payload_key(alias)
             if normalized_alias in index:
-                index.setdefault(normalize_payload_key(canonical_name), index[normalized_alias])
+                index.setdefault(
+                    normalize_payload_key(canonical_name), index[normalized_alias]
+                )
 
     return index
 
 
 def lookup_payload_value(
-    payload_index: Dict[str, tuple[str, Any]], indicator_key: Optional[str]
+    payload_index: dict[str, tuple[str, Any]], indicator_key: str | None
 ) -> tuple[bool, Any]:
     """Retrieve an indicator value from a precomputed payload index."""
     if not indicator_key:
@@ -332,7 +341,7 @@ def lookup_payload_value(
     return False, None
 
 
-def payload_indicator_keys(payload: Optional[Dict[str, Any]]) -> List[str]:
+def payload_indicator_keys(payload: dict[str, Any] | None) -> list[str]:
     """Return indicator keys visible to text matching."""
     search_dict = get_indicator_payload(payload)
     return list(search_dict.keys()) if search_dict is not None else []
@@ -363,7 +372,9 @@ def numeric_claim_matches(
 
     text_lower = claim_text.casefold()
     implies_decrease = any(term in text_lower for term in DECREASE_TERMS)
-    magnitude_matches = abs(abs(extracted_value) - abs(numeric_payload)) < NUMERIC_TOLERANCE
+    magnitude_matches = (
+        abs(abs(extracted_value) - abs(numeric_payload)) < NUMERIC_TOLERANCE
+    )
 
     if magnitude_matches and implies_decrease and numeric_payload < 0:
         return True, "Claim grounded in payload"
@@ -374,7 +385,9 @@ def numeric_claim_matches(
     )
 
 
-def verify_claims(claims: List[Claim], payload: Optional[Dict[str, Any]]) -> List[VerifiedClaim]:
+def verify_claims(
+    claims: list[Claim], payload: dict[str, Any] | None
+) -> list[VerifiedClaim]:
     """Verify claims against structured indicator payload.
 
     Rules:
@@ -384,7 +397,7 @@ def verify_claims(claims: List[Claim], payload: Optional[Dict[str, Any]]) -> Lis
     - If indicator doesn't exist -> Reject.
     - If sentence contains unsupported facts -> Reject.
     """
-    results: List[VerifiedClaim] = []
+    results: list[VerifiedClaim] = []
 
     if not isinstance(claims, list):
         return results
@@ -482,7 +495,9 @@ def verify_claims(claims: List[Claim], payload: Optional[Dict[str, Any]]) -> Lis
             )
 
         if is_verified and claim.extracted_category is not None:
-            ext_cat = normalize_match_text(str(claim.extracted_category)).replace(" ", "_")
+            ext_cat = normalize_match_text(str(claim.extracted_category)).replace(
+                " ", "_"
+            )
             pay_cat = normalize_match_text(str(payload_val)).replace(" ", "_")
             if is_negated_category(claim.text, ext_cat) or ext_cat != pay_cat:
                 is_verified = False
@@ -504,8 +519,7 @@ def verify_claims(claims: List[Claim], payload: Optional[Dict[str, Any]]) -> Lis
     return results
 
 
-
-def clean_response(text: Optional[str], verified_claims: List[VerifiedClaim]) -> str:
+def clean_response(text: str | None, verified_claims: list[VerifiedClaim]) -> str:
     """Format original response text keeping rejected claims visible with strike-through tags.
 
     Format for rejected text:
@@ -538,8 +552,7 @@ def replace_first_unmarked_claim(text: str, target: str) -> str:
 
         end = start + len(target)
         already_marked = (
-            text[max(0, start - 2) : start] == "~~"
-            and text[end : end + 2] == "~~"
+            text[max(0, start - 2) : start] == "~~" and text[end : end + 2] == "~~"
         )
         if already_marked:
             search_from = end
@@ -549,7 +562,7 @@ def replace_first_unmarked_claim(text: str, target: str) -> str:
         return text[:start] + replacement + text[end:]
 
 
-def compute_trust_score(claims_checked: int, claims_grounded: int) -> Dict[str, Any]:
+def compute_trust_score(claims_checked: int, claims_grounded: int) -> dict[str, Any]:
     """Compute trust score statistics based on checked vs grounded claims.
 
     Formula: verified / checked
@@ -567,7 +580,7 @@ def compute_trust_score(claims_checked: int, claims_grounded: int) -> Dict[str, 
     }
 
 
-def verify(response_text: Optional[str], payload: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+def verify(response_text: str | None, payload: dict[str, Any] | None) -> dict[str, Any]:
     """Master API function for deterministic response verification.
 
     Input:

@@ -3,7 +3,6 @@ from pathlib import Path
 from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 PROJECT_ROOT = BACKEND_DIR.parent
 ENV_FILE_PATHS = (PROJECT_ROOT / ".env", BACKEND_DIR / ".env")
