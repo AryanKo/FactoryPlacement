@@ -45,7 +45,9 @@ class GEEClient:
                 key_data=key_json.replace("\\n", "\n"),
             )
 
-        key_ref = (settings.ee_private_key or settings.google_application_credentials).strip()
+        key_ref = (
+            settings.ee_private_key or settings.google_application_credentials
+        ).strip()
         if not key_ref:
             return None
 
@@ -83,7 +85,9 @@ class GEEClient:
         """Return true when a configured key value is intended as a file path."""
         return value.lower().endswith(".json") or "\\" in value or "/" in value
 
-    def _sync_get_all_indicators(self, lat: float, lon: float) -> tuple[float | None, str | None]:
+    def _sync_get_all_indicators(
+        self, lat: float, lon: float
+    ) -> tuple[float | None, str | None]:
         """Blocking call to GEE fetching both surface water trend and flood exposure in one request."""
         point = ee.Geometry.Point([lon, lat])
 
@@ -189,7 +193,9 @@ class GEEClient:
         return RiskIndicators(
             surface_water_trend=trend_indicator,
             flood_exposure=flood_indicator,
-            rainfall_proxy=IndicatorValue(value=None, source=None, confidence="no_data"),
+            rainfall_proxy=IndicatorValue(
+                value=None, source=None, confidence="no_data"
+            ),
         )
 
     def _get_fallback_indicators(self) -> RiskIndicators:

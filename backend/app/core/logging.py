@@ -11,4 +11,5 @@ def setup_logging():
     logger = logging.getLogger("aquashield")
     return logger
 
+
 logger = setup_logging()

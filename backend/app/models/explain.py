@@ -8,6 +8,7 @@ class ExplainRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+
 class Recommendation(BaseModel):
     text: str
     source_doc: str
@@ -16,6 +17,7 @@ class Recommendation(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+
 class VerificationStats(BaseModel):
     claims_checked: int
     claims_grounded: int
@@ -23,6 +25,7 @@ class VerificationStats(BaseModel):
     trust_score: float
 
     model_config = ConfigDict(extra="forbid")
+
 
 class ExplainResponse(BaseModel):
     explanation: str
