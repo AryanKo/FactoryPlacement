@@ -43,6 +43,12 @@ def test_get_risk_valid():
     assert "indicators" in data
     assert "surface_water_trend" in data["indicators"]
     assert "flood_exposure" in data["indicators"]
+    assert "rainfall" in data["indicators"]
+    assert "elevation" in data["indicators"]
+    assert "slope" in data["indicators"]
+    assert "land_cover" in data["indicators"]
+    assert "vegetation_index" in data["indicators"]
+    assert "distance_to_water" in data["indicators"]
     assert "rainfall_proxy" in data["indicators"]
 
     # Check no_data adherence
@@ -83,7 +89,16 @@ def test_get_risk_invalid_params():
 @patch.object(GEEClient, '_sync_get_all_indicators')
 def test_gee_production_success(mock_sync):
     # Setup mock GEE response
-    mock_sync.return_value = (5.5, "high")
+    mock_sync.return_value = {
+        "change_norm": 5.5,
+        "max_extent": 1,
+        "rainfall": 1200,
+        "elevation": 24,
+        "slope": 1.5,
+        "land_cover": 13,
+        "vegetation_index": 0.42,
+        "distance_to_water": 850,
+    }
     
     # Temporarily force production mode
     settings.use_mock_gee = False
@@ -98,6 +113,13 @@ def test_gee_production_success(mock_sync):
     assert data["indicators"]["surface_water_trend"]["confidence"] == "measured"
     assert data["indicators"]["flood_exposure"]["value"] == "high"
     assert data["indicators"]["flood_exposure"]["confidence"] == "measured"
+    assert data["indicators"]["rainfall"]["value"] == 1200
+    assert data["indicators"]["rainfall"]["unit"] == "mm/year"
+    assert data["indicators"]["elevation"]["value"] == 24
+    assert data["indicators"]["slope"]["value"] == 1.5
+    assert data["indicators"]["land_cover"]["value"] == "Urban and Built-up Lands (13)"
+    assert data["indicators"]["vegetation_index"]["value"] == 0.42
+    assert data["indicators"]["distance_to_water"]["value"] == 850
     
     # Restore settings
     settings.use_mock_gee = True
@@ -119,6 +141,12 @@ def test_gee_production_exception_fallback(mock_sync):
     assert data["indicators"]["surface_water_trend"]["confidence"] == "no_data"
     assert data["indicators"]["flood_exposure"]["value"] is None
     assert data["indicators"]["flood_exposure"]["confidence"] == "no_data"
+    assert data["indicators"]["rainfall"]["value"] is None
+    assert data["indicators"]["elevation"]["value"] is None
+    assert data["indicators"]["slope"]["value"] is None
+    assert data["indicators"]["land_cover"]["value"] is None
+    assert data["indicators"]["vegetation_index"]["value"] is None
+    assert data["indicators"]["distance_to_water"]["value"] is None
     
     # Restore settings
     settings.use_mock_gee = True
@@ -187,17 +215,23 @@ def test_gee_missing_key_path_does_not_initialize(mock_credentials, mock_initial
 
 @patch("app.services.gee_client.ee")
 def test_gee_query_uses_lon_lat_geometry(mock_ee):
-    mock_ee.Image.return_value.select.return_value.reduceRegion.return_value.getInfo.return_value = {
+    mock_ee.Image.return_value.select.return_value.addBands.return_value.reduceRegion.return_value.getInfo.return_value = {
         "change_norm": 1.25,
         "max_extent": 1,
+        "rainfall": 900,
+        "elevation": 15,
+        "slope": 2,
+        "land_cover": 12,
+        "vegetation_index": 0.3,
+        "distance_to_water": 1000,
     }
 
     client_instance = object.__new__(GEEClient)
-    trend, flood = client_instance._sync_get_all_indicators(12.3, 45.6)
+    values = client_instance._sync_get_all_indicators(12.3, 45.6)
 
     mock_ee.Geometry.Point.assert_called_once_with([45.6, 12.3])
-    assert trend == 1.25
-    assert flood == "high"
+    assert values["change_norm"] == 1.25
+    assert values["max_extent"] == 1
 
 
 def test_gee_auth_failure_fallback():
