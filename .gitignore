@@ -1,0 +1,18 @@
+# Security: Environment & API keys
+.env
+.env.local
+.env.*.local
+*.env
+!.env.example
+
+# Node / Frontend
+**/node_modules/
+**/dist/
+**/dist-ssr/
+*.log
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
