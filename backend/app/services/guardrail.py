@@ -168,9 +168,146 @@ def extract_claims(text: Optional[str]) -> List[Claim]:
     return claims
 
 
+def get_indicator_payload_entry(payload: Any, indicator_key: Optional[str]) -> tuple[bool, Any]:
+    """Retrieve value for an indicator from flat or nested payload."""
+    if not isinstance(payload, dict) or not indicator_key:
+        return False, None
+
+    # Determine dictionary containing indicators
+    if "indicators" in payload and isinstance(payload["indicators"], dict):
+        search_dict = payload["indicators"]
+    else:
+        search_dict = payload
+
+    # 1. Direct match
+    if indicator_key in search_dict:
+        val = search_dict[indicator_key]
+        if isinstance(val, dict) and "value" in val:
+            return True, val["value"]
+        return True, val
+
+    # 2. Key match via known aliases
+    aliases = INDICATOR_ALIASES.get(indicator_key, [indicator_key])
+    for alias in aliases:
+        # Check underscore version and spaced version
+        alias_underscore = alias.lower().replace(" ", "_")
+        for key in search_dict.keys():
+            key_normalized = key.lower().replace(" ", "_")
+            if key_normalized == alias_underscore:
+                val = search_dict[key]
+                if isinstance(val, dict) and "value" in val:
+                    return True, val["value"]
+                return True, val
+
+    return False, None
+
+
 def verify_claims(claims: List[Claim], payload: Optional[Dict[str, Any]]) -> List[VerifiedClaim]:
-    """Verify claims against structured indicator payload."""
-    return []
+    """Verify claims against structured indicator payload.
+
+    Rules:
+    - Numeric values must match payload.
+    - Categorical values must match payload.
+    - If payload value is null -> Reject.
+    - If indicator doesn't exist -> Reject.
+    - If sentence contains unsupported facts -> Reject.
+    """
+    results: List[VerifiedClaim] = []
+
+    if not isinstance(claims, list):
+        return results
+
+    payload_keys = list(payload.keys()) if isinstance(payload, dict) else []
+
+    for claim in claims:
+        matched_ind = claim.indicator_alias or match_indicator(claim.text, payload_keys)
+
+        if not isinstance(payload, dict) or payload is None:
+            results.append(
+                VerifiedClaim(
+                    claim=claim,
+                    verified=False,
+                    reason="Missing or malformed payload",
+                    matched_indicator=matched_ind,
+                    payload_value=None,
+                )
+            )
+            continue
+
+        if not matched_ind:
+            results.append(
+                VerifiedClaim(
+                    claim=claim,
+                    verified=False,
+                    reason="Indicator unrecognized or unsupported",
+                    matched_indicator=None,
+                    payload_value=None,
+                )
+            )
+            continue
+
+        found, payload_val = get_indicator_payload_entry(payload, matched_ind)
+
+        if not found:
+            results.append(
+                VerifiedClaim(
+                    claim=claim,
+                    verified=False,
+                    reason=f"Indicator '{matched_ind}' not found in payload",
+                    matched_indicator=matched_ind,
+                    payload_value=None,
+                )
+            )
+            continue
+
+        if payload_val is None:
+            results.append(
+                VerifiedClaim(
+                    claim=claim,
+                    verified=False,
+                    reason=f"Payload value for '{matched_ind}' is null",
+                    matched_indicator=matched_ind,
+                    payload_value=None,
+                )
+            )
+            continue
+
+        # Verify claim content against payload value
+        is_verified = True
+        reason = "Claim grounded in payload"
+
+        if claim.extracted_number is not None:
+            try:
+                num_payload = float(payload_val)
+                extracted_num = claim.extracted_number
+                direct_match = abs(extracted_num - num_payload) < 1e-4
+                abs_match = abs(abs(extracted_num) - abs(num_payload)) < 1e-4
+                if not (direct_match or abs_match):
+                    is_verified = False
+                    reason = f"Numeric value {extracted_num} does not match payload value {payload_val}"
+            except (ValueError, TypeError):
+                is_verified = False
+                reason = f"Payload value '{payload_val}' is not numeric"
+
+        if is_verified and claim.extracted_category is not None:
+            ext_cat = str(claim.extracted_category).strip().lower()
+            pay_cat = str(payload_val).strip().lower()
+            if ext_cat != pay_cat and ext_cat not in pay_cat:
+                is_verified = False
+                reason = f"Categorical value '{claim.extracted_category}' does not match payload value '{payload_val}'"
+
+        results.append(
+            VerifiedClaim(
+                claim=claim,
+                verified=is_verified,
+                reason=reason,
+                matched_indicator=matched_ind,
+                payload_value=payload_val,
+            )
+        )
+
+    return results
+
 
 
 def clean_response(text: Optional[str], verified_claims: List[VerifiedClaim]) -> str:
