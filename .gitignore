@@ -1,3 +1,10 @@
+# Python
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
 # Security: Environment & API keys
 .env
 .env.local
@@ -16,3 +23,4 @@
 Thumbs.db
 .vscode/
 .idea/
+

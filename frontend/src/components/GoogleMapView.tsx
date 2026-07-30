@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { APIProvider, Map, Marker, useMap, useMapsLibrary } from '@vis.gl/react-google-maps';
-import { DARK_WATER_MAP_STYLE } from '../utils/mapStyles';
+import React, { useEffect, useRef } from 'react';
+import { Map, useMap, useMapsLibrary } from '@vis.gl/react-google-maps';
 import { PRESET_LOCATIONS } from '../api/mockData';
 import { Search, AlertTriangle, Key, Compass } from 'lucide-react';
 
@@ -8,9 +7,12 @@ interface GoogleMapViewProps {
   selectedLocation: { lat: number; lon: number };
   onSelectLocation: (location: { lat: number; lon: number }, placeName?: string) => void;
   loadingStep: 'idle' | 'risk' | 'explain';
+  hasApiKey: boolean;
+  manualKey: string;
+  setManualKey: (key: string) => void;
 }
 
-// Places Autocomplete input for top-right header placement
+// Places Autocomplete input component
 export const PlacesAutocompleteInput: React.FC<{
   onPlaceSelect: (lat: number, lon: number, name: string) => void;
 }> = ({ onPlaceSelect }) => {
@@ -21,10 +23,10 @@ export const PlacesAutocompleteInput: React.FC<{
     if (!placesLib || !inputRef.current) return;
 
     const auto = new placesLib.Autocomplete(inputRef.current, {
-      fields: ['geometry', 'formatted_address', 'name']
+      fields: ['geometry', 'formatted_address', 'name'],
     });
 
-    auto.addListener('place_changed', () => {
+    const listener = auto.addListener('place_changed', () => {
       const place = auto.getPlace();
       if (place.geometry?.location) {
         const lat = place.geometry.location.lat();
@@ -33,142 +35,166 @@ export const PlacesAutocompleteInput: React.FC<{
         onPlaceSelect(lat, lon, name);
       }
     });
+
+    return () => {
+      if (listener) google.maps.event.removeListener(listener);
+    };
   }, [placesLib, onPlaceSelect]);
 
   return (
-    <div className="relative w-full">
-      <Search className="w-3.5 h-3.5 text-blue-400 absolute left-3 top-1/2 -translate-y-1/2" />
+    <div className="relative flex-1">
+      <Search className="w-4 h-4 text-sky-500 absolute left-3 top-1/2 -translate-y-1/2" />
       <input
         ref={inputRef}
         type="text"
-        placeholder="Search place or basin (Places API)..."
-        className="w-full bg-slate-900/90 text-gray-100 pl-8 pr-3 py-1.5 rounded-xl border border-white/10 text-xs font-sans focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 shadow-md"
+        placeholder="Search location or river basin..."
+        className="w-full bg-white/60 text-slate-900 pl-9 pr-4 py-2 rounded-xl border border-sky-200 text-sm font-sans focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 shadow-sm backdrop-blur-md transition-all placeholder:text-slate-400"
       />
     </div>
   );
 };
 
-// Camera Controller component: smoothly pans to new location without locking camera gestures
+// Smoothly pans camera to the selected location without locking gestures.
 const MapCameraController: React.FC<{ center: { lat: number; lng: number } }> = ({ center }) => {
   const map = useMap();
-
   useEffect(() => {
-    if (map) {
-      map.panTo(center);
-    }
+    if (map) map.panTo(center);
   }, [map, center.lat, center.lng]);
-
   return null;
 };
 
-// Map click event listener component
-const MapClickListener: React.FC<{
-  onMapClick: (lat: number, lon: number) => void;
-}> = ({ onMapClick }) => {
+// AdvancedMarkerElement wrapper.
+// mapId="aquashield-map" (set on <Map>) is required for AdvancedMarkerElement to work.
+const AdvancedMarker: React.FC<{ position: { lat: number; lng: number }; title?: string }> = ({
+  position,
+  title,
+}) => {
   const map = useMap();
+  const markerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
 
   useEffect(() => {
     if (!map) return;
+    let cancelled = false;
 
-    const listener = map.addListener('click', (e: google.maps.MapMouseEvent) => {
-      if (e.latLng) {
-        onMapClick(e.latLng.lat(), e.latLng.lng());
+    (async () => {
+      const { AdvancedMarkerElement } = (await google.maps.importLibrary(
+        'marker'
+      )) as google.maps.MarkerLibrary;
+
+      if (cancelled) return;
+
+      if (!markerRef.current) {
+        markerRef.current = new AdvancedMarkerElement({
+          map,
+          position,
+          title: title ?? 'Target Telemetry Grid',
+        });
+      } else {
+        markerRef.current.position = position;
       }
-    });
+    })();
 
     return () => {
-      google.maps.event.removeListener(listener);
+      cancelled = true;
+      if (markerRef.current) {
+        markerRef.current.map = null;
+        markerRef.current = null;
+      }
     };
-  }, [map, onMapClick]);
+  }, [map]);
+
+  useEffect(() => {
+    if (markerRef.current) {
+      markerRef.current.position = position;
+    }
+  }, [position.lat, position.lng]);
 
   return null;
 };
 
-// Main Map View Wrapper
+// Main Map View
 export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
   selectedLocation,
   onSelectLocation,
-  loadingStep
+  loadingStep,
+  hasApiKey,
+  manualKey,
+  setManualKey,
 }) => {
-  // Read API Key from Vite env
-  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
-  const [manualKey, setManualKey] = useState('');
-  const activeKey = manualKey || apiKey;
-
-  // Handle map click
-  const handleMapClick = useCallback(
-    (lat: number, lon: number) => {
-      onSelectLocation({ lat, lon });
-    },
-    [onSelectLocation]
-  );
-
   return (
-    <div className="relative w-full h-full min-h-screen">
-      {/* Full-Bleed Google Maps Provider */}
-      {activeKey ? (
-        <APIProvider apiKey={activeKey} libraries={['places', 'geocoding']}>
-          <Map
-            style={{ width: '100vw', height: '100vh' }}
-            defaultCenter={{ lat: selectedLocation.lat, lng: selectedLocation.lon }}
-            defaultZoom={7}
-            gestureHandling="greedy"
-            styles={DARK_WATER_MAP_STYLE}
-            disableDefaultUI={false}
-            zoomControl={true}
-            mapTypeControl={false}
-            streetViewControl={false}
-            fullscreenControl={false}
-          >
-            <MapCameraController center={{ lat: selectedLocation.lat, lng: selectedLocation.lon }} />
-            <MapClickListener onMapClick={handleMapClick} />
-            <Marker
-              position={{ lat: selectedLocation.lat, lng: selectedLocation.lon }}
-              title="Target Telemetry Grid"
-            />
-          </Map>
-        </APIProvider>
+    <div className="relative w-full h-full">
+      {hasApiKey ? (
+        <Map
+          style={{ width: '100%', height: '100%' }}
+          defaultCenter={{ lat: selectedLocation.lat, lng: selectedLocation.lon }}
+          defaultZoom={7}
+          gestureHandling="greedy"
+          disableDefaultUI={false}
+          zoomControl={true}
+          mapTypeControl={false}
+          streetViewControl={false}
+          fullscreenControl={false}
+          mapId="aquashield-map"
+          zoomControlOptions={{ position: 6 }}
+          onClick={(e) => {
+            if (e.detail.latLng) {
+              onSelectLocation({ lat: e.detail.latLng.lat, lon: e.detail.latLng.lng });
+            }
+          }}
+        >
+          <MapCameraController center={{ lat: selectedLocation.lat, lng: selectedLocation.lon }} />
+          <AdvancedMarker
+            position={{ lat: selectedLocation.lat, lng: selectedLocation.lon }}
+            title="Target Telemetry Grid"
+          />
+        </Map>
       ) : (
-        /* Graceful fallback if VITE_GOOGLE_MAPS_API_KEY is missing */
-        <div className="absolute inset-0 bg-[#090d16] flex flex-col items-center justify-center p-6 text-center z-10">
-          <div className="max-w-md w-full glass-panel p-6 space-y-4 border border-blue-500/30 text-left">
-            <div className="flex items-center gap-3 text-amber-400">
-              <AlertTriangle className="w-6 h-6 flex-shrink-0" />
+        <div className="absolute inset-0 bg-sky-50 flex flex-col items-center justify-center p-6 text-center z-10">
+          <div className="max-w-md w-full glass-panel p-8 space-y-5 text-left">
+            <div className="flex items-center gap-3 text-sky-600">
+              <AlertTriangle className="w-8 h-8 flex-shrink-0 text-sky-500" />
               <div>
-                <h3 className="font-bold text-gray-100">Google Maps API Key Required</h3>
-                <p className="text-xs text-gray-400">VITE_GOOGLE_MAPS_API_KEY environment variable is not set.</p>
+                <h3 className="font-bold text-slate-900 text-lg">Maps API Key Required</h3>
+                <p className="text-sm text-slate-500">Live map requires a Google Maps key.</p>
               </div>
             </div>
 
-            <p className="text-xs text-gray-300 leading-relaxed">
-              To view the live full-bleed Google Map, add your key to <code className="text-blue-400 font-mono">.env</code> as <code className="text-blue-400 font-mono">VITE_GOOGLE_MAPS_API_KEY</code> or input it below for immediate testing:
+            <p className="text-sm text-slate-600 leading-relaxed">
+              Add{' '}
+              <code className="text-sky-600 font-mono bg-sky-100 px-1.5 py-0.5 rounded">
+                VITE_GOOGLE_MAPS_API_KEY
+              </code>{' '}
+              to your{' '}
+              <code className="text-sky-600 font-mono bg-sky-100 px-1.5 py-0.5 rounded">.env</code>{' '}
+              or input it below:
             </p>
 
             <div className="flex items-center gap-2">
-              <Key className="w-4 h-4 text-blue-400" />
+              <Key className="w-5 h-5 text-sky-400" />
               <input
                 type="text"
                 placeholder="Paste AIzaSy... API key"
                 value={manualKey}
                 onChange={(e) => setManualKey(e.target.value)}
-                className="flex-1 bg-slate-950 text-gray-100 px-3 py-1.5 rounded text-xs border border-white/10 font-mono focus:outline-none focus:border-blue-400"
+                className="flex-1 bg-white text-slate-900 px-4 py-2.5 rounded-xl text-sm border border-sky-200 font-mono focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-all shadow-sm"
               />
             </div>
 
-            {/* Interactive Fallback Grid selector so mock demo functions seamlessly */}
-            <div className="pt-2 border-t border-white/10 space-y-2">
-              <p className="text-xs text-gray-400 font-semibold flex items-center gap-1">
-                <Compass className="w-3.5 h-3.5 text-blue-400" /> Or select a telemetry preset location to run pipeline:
+            <div className="pt-4 border-t border-sky-100 space-y-3">
+              <p className="text-sm text-slate-600 font-semibold flex items-center gap-1.5">
+                <Compass className="w-4 h-4 text-sky-500" /> Or select a test basin:
               </p>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-3">
                 {PRESET_LOCATIONS.map((preset) => (
                   <button
                     key={preset.id}
                     onClick={() => onSelectLocation({ lat: preset.lat, lon: preset.lon }, preset.name)}
-                    className="p-2 rounded bg-slate-900 hover:bg-slate-800 text-xs text-left border border-white/10 text-gray-200"
+                    className="p-3 rounded-xl bg-white hover:bg-sky-50 text-sm text-left border border-sky-200 hover:border-sky-400 transition-all shadow-sm hover:shadow text-slate-800"
                   >
-                    <div className="font-semibold text-blue-400">{preset.name}</div>
-                    <div className="text-[10px] text-gray-500 font-mono">{preset.lat}, {preset.lon}</div>
+                    <div className="font-semibold text-sky-600">{preset.name}</div>
+                    <div className="text-xs text-slate-400 font-mono mt-0.5">
+                      {preset.lat}, {preset.lon}
+                    </div>
                   </button>
                 ))}
               </div>
@@ -177,17 +203,16 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({
         </div>
       )}
 
-      {/* Loading Overlay when pipeline executes */}
       {loadingStep !== 'idle' && (
-        <div className="fixed inset-0 z-[4000] bg-slate-950/70 backdrop-blur-sm flex flex-col items-center justify-center gap-3">
-          <div className="w-12 h-12 rounded-full border-4 border-blue-500/20 border-t-blue-500 animate-spin"></div>
-          <div className="text-center space-y-1">
-            <p className="text-sm font-semibold text-blue-400 font-mono">
+        <div className="absolute inset-0 z-[2000] bg-white/60 backdrop-blur-[2px] flex flex-col items-center justify-center gap-4">
+          <div className="w-14 h-14 rounded-full border-4 border-sky-200 border-t-sky-500 animate-spin shadow-lg" />
+          <div className="text-center space-y-1.5 bg-white/80 px-6 py-3 rounded-2xl shadow-sm border border-sky-100">
+            <p className="text-sm font-bold text-sky-600 font-mono tracking-tight">
               {loadingStep === 'risk'
-                ? 'Fetching Satellite Telemetry (GET /api/risk)...'
-                : 'Executing Gemma 4 Guardrail Verifier (POST /api/explain)...'}
+                ? 'Fetching Telemetry (GET /api/risk)...'
+                : 'Running Gemma 4 + Guardrail Verifier...'}
             </p>
-            <p className="text-xs text-gray-400">Verifying AI claims against GEE source data</p>
+            <p className="text-xs text-slate-500 font-medium">Verifying claims against source data</p>
           </div>
         </div>
       )}

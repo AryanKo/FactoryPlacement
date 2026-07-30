@@ -41,16 +41,22 @@ def call_gemma_api(prompt_text: str, temperature: float = 0.2, max_retries: int 
     Calls Google AI Studio API for Gemma 4 31B Instruct.
     Implements exponential backoff on rate limits (429) or server errors (5xx).
     Returns (response_text, is_fallback_or_mock).
+
+    Splits the prompt on SYSTEM:/DATA:/SOURCE:/TASK: markers and uses the SDK's
+    native system_instruction parameter so the model correctly applies the
+    grounding constraint — sending everything as a single blob causes empty responses.
     """
     global _retry_stats
 
-    # Check for API Key
     api_key = GOOGLE_AI_STUDIO_API_KEY or os.getenv("GEMINI_API_KEY", "")
 
     if not api_key:
         print("[GEMMA WARN] GOOGLE_AI_STUDIO_API_KEY not set. Returning grounded offline response.")
-        return ("Based on GEE indicators, surface water has decreased by 12.4% over 10 years. "
-                "Per AWS Water Stewardship Standard §3.1, the facility must reduce freshwater intake by 15%.", True)
+        return (
+            "Based on GEE indicators, surface water has decreased by 12.4% over 10 years. "
+            "Per AWS Water Stewardship Standard §3.1, the facility must reduce freshwater intake by 15%.",
+            True,
+        )
 
     try:
         from google import genai
@@ -60,20 +66,59 @@ def call_gemma_api(prompt_text: str, temperature: float = 0.2, max_retries: int 
         attempt = 0
         backoff_delay = 1.0
 
+        # Split "SYSTEM:\n...\n\nDATA:\n...\n\nSOURCE:...\n\nTASK:\n..." into two parts.
+        # The system block (everything before DATA:) becomes system_instruction.
+        # The rest becomes the user message so the SDK routes it correctly.
+        system_text = (
+            "You are a water-risk assistant. You may ONLY state facts that appear in the DATA block below. "
+            "If an indicator value is null or 'no_data', you must state 'not available' — do NOT estimate, "
+            "infer, or fill in a plausible value under any circumstances. "
+            "Every recommendation must quote or closely paraphrase the SOURCE block and cite its section."
+        )
+
+        # Strip any leading SYSTEM: block from the prompt_text to avoid duplication
+        user_text = prompt_text
+        if prompt_text.strip().startswith("SYSTEM:"):
+            parts = prompt_text.split("DATA:", 1)
+            if len(parts) == 2:
+                user_text = "DATA:" + parts[1]
+
         while attempt <= max_retries:
             try:
                 response = client.models.generate_content(
                     model=GEMMA_MODEL_NAME,
-                    contents=prompt_text,
+                    contents=user_text,
                     config=types.GenerateContentConfig(
+                        system_instruction=system_text,
                         temperature=temperature,
-                        max_output_tokens=500,
-                    )
+                        max_output_tokens=600,
+                    ),
                 )
-                if response and response.text:
-                    return (response.text.strip(), False)
+
+                # Log response metadata for debugging
+                if response.candidates:
+                    candidate = response.candidates[0]
+                    finish_reason = getattr(candidate, "finish_reason", "UNKNOWN")
+                    print(f"[GEMMA] finish_reason={finish_reason}")
+                    safety_ratings = getattr(candidate, "safety_ratings", None) or []
+                    for sr in safety_ratings:
+                        print(f"[GEMMA] safety: {sr}")
+                    # Extract text from parts if response.text is None
+                    if response.text:
+                        return (response.text.strip(), False)
+                    # Try extracting from parts directly
+                    content = candidate.content
+                    if content and content.parts:
+                        full_text = "".join(
+                            part.text for part in content.parts if hasattr(part, "text") and part.text
+                        )
+                        if full_text.strip():
+                            return (full_text.strip(), False)
+                    print(f"[GEMMA WARN] 200 OK but no text content. finish_reason={finish_reason}")
+                    return (f"Gemma returned no content (finish_reason={finish_reason}). GEE data is available above.", True)
                 else:
-                    return ("No content returned from Gemma model.", True)
+                    print("[GEMMA WARN] No candidates in response.")
+                    return ("Gemma returned no candidates. GEE data is available above.", True)
 
             except Exception as exc:
                 exc_str = str(exc)
@@ -84,13 +129,11 @@ def call_gemma_api(prompt_text: str, temperature: float = 0.2, max_retries: int 
                     print(f"[GEMMA ERROR] Max retries ({max_retries}) exceeded: {exc_str}", file=sys.stderr)
                     raise exc
 
-                # Check if error is retryable (429 rate limit or 5xx server error)
                 if "429" in exc_str or "500" in exc_str or "503" in exc_str or "RESOURCE_EXHAUSTED" in exc_str:
                     print(f"[GEMMA RETRY] Attempt {attempt}/{max_retries} failed ({exc_str[:60]}). Retrying in {backoff_delay:.1f}s...")
                     time.sleep(backoff_delay)
                     backoff_delay *= 2.0
                 else:
-                    # Non-retryable error
                     raise exc
 
     except Exception as e:

@@ -32,6 +32,8 @@ export interface RiskResponse {
 
 export interface ExplainRequest {
   indicators: RiskResponse['indicators'];
+  lat?: number;
+  lon?: number;
 }
 
 export interface RejectedClaim {

@@ -51,7 +51,11 @@ export const App: React.FC = () => {
 
       // Step 2: POST /api/explain
       setLoadingStep('explain');
-      const explainResult = await fetchExplanation({ indicators: riskResult.indicators });
+      const explainResult = await fetchExplanation({
+        indicators: riskResult.indicators,
+        lat: location.lat,
+        lon: location.lon,
+      });
       setExplainData(explainResult);
 
     } catch (err: any) {

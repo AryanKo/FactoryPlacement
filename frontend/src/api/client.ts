@@ -1,9 +1,12 @@
 import type { RiskRequest, RiskResponse, ExplainRequest, ExplainResponse } from '../types/api';
 import { MOCK_RISK_FIXTURES, MOCK_EXPLAIN_FIXTURES, PRESET_LOCATIONS } from './mockData';
 
-// Configurable flag for dev mode. Defaults to true for standalone laptop demoing.
-export const USE_MOCK_API = true;
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+// When VITE_USE_MOCK_API=false (or unset) we hit the real FastAPI backend.
+// Set VITE_USE_MOCK_API=true in frontend/.env only if you want offline-only demo mode.
+export const USE_MOCK_API = import.meta.env.VITE_USE_MOCK_API === 'true';
+
+// Points to the FastAPI backend. Override with VITE_API_BASE_URL in frontend/.env.
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
 
 /**
  * Finds the closest mock key based on coordinates or defaults to 'chennai'
@@ -81,12 +84,40 @@ export async function fetchExplanation(payload: ExplainRequest): Promise<Explain
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify(payload)
+    body: JSON.stringify({
+      indicators: payload.indicators,
+      lat: payload.lat,
+      lon: payload.lon,
+    })
   });
 
   if (!response.ok) {
-    throw new Error(`POST /api/explain failed with status ${response.status}`);
+    const errBody = await response.text().catch(() => '');
+    throw new Error(`POST /api/explain failed with status ${response.status}: ${errBody}`);
   }
 
-  return response.json();
+  // Normalize the backend response shape to match the frontend ExplainResponse type.
+  // The backend guardrail returns rejected_claims as string[], but the frontend
+  // VerificationBadge expects RejectedClaim objects with id, claim, and reason fields.
+  const raw = await response.json();
+  const normalizedRejected = (raw.verification?.rejected_claims ?? []).map(
+    (entry: string | { claim?: string; reason?: string; id?: string }, idx: number) => {
+      if (typeof entry === 'string') {
+        // Backend returns "claim text (reason)" — split on last " (" occurrence
+        const parenIdx = entry.lastIndexOf(' (');
+        const claim = parenIdx > -1 ? entry.slice(0, parenIdx) : entry;
+        const reason = parenIdx > -1 ? entry.slice(parenIdx + 2, -1) : 'Unverifiable';
+        return { id: `rej-${idx}`, claim, reason };
+      }
+      return { id: entry.id ?? `rej-${idx}`, claim: entry.claim ?? '', reason: entry.reason ?? '' };
+    }
+  );
+
+  return {
+    ...raw,
+    verification: {
+      ...raw.verification,
+      rejected_claims: normalizedRejected,
+    },
+  } as ExplainResponse;
 }
