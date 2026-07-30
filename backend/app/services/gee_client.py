@@ -31,10 +31,10 @@ class GEEClient:
                 ee.Initialize(credentials, **initialize_kwargs)
                 GEEClient._initialized = True
                 logger.info("Successfully initialized real GEE client")
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 logger.error(f"Failed to initialize GEE client: {e!s}")
 
-    def _build_credentials(self):  # noqa: ANN202
+    def _build_credentials(self):
         """Build Earth Engine service account credentials from configured sources."""
         service_account = settings.ee_service_account or None
 
@@ -132,7 +132,7 @@ class GEEClient:
         except asyncio.TimeoutError:
             logger.error(f"GEE query timed out after {timeout} seconds.")
             return None, None
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.error(f"GEE query failed: {e!s}")
             return None, None
 

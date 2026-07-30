@@ -32,7 +32,6 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from app.services.models import Claim, ClaimType, GuardrailResult, VerifiedClaim
 
-
 INDICATOR_ALIASES: Dict[str, List[str]] = {
     "surface_water_trend": [
         "surface water trend",
