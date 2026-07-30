@@ -10,7 +10,7 @@ interface GoogleMapViewProps {
   loadingStep: 'idle' | 'risk' | 'explain';
 }
 
-// Inner component for Places Autocomplete input
+// Places Autocomplete input for top-right header placement
 export const PlacesAutocompleteInput: React.FC<{
   onPlaceSelect: (lat: number, lon: number, name: string) => void;
 }> = ({ onPlaceSelect }) => {
@@ -36,13 +36,13 @@ export const PlacesAutocompleteInput: React.FC<{
   }, [placesLib, onPlaceSelect]);
 
   return (
-    <div className="relative flex-1">
-      <Search className="w-4 h-4 text-blue-400 absolute left-3 top-1/2 -translate-y-1/2" />
+    <div className="relative w-full">
+      <Search className="w-3.5 h-3.5 text-blue-400 absolute left-3 top-1/2 -translate-y-1/2" />
       <input
         ref={inputRef}
         type="text"
-        placeholder="Search location or river basin (Places API)..."
-        className="w-full bg-slate-900/90 text-gray-100 pl-9 pr-4 py-1.5 rounded-xl border border-white/10 text-xs font-sans focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 shadow-md backdrop-blur-md"
+        placeholder="Search place or basin (Places API)..."
+        className="w-full bg-slate-900/90 text-gray-100 pl-8 pr-3 py-1.5 rounded-xl border border-white/10 text-xs font-sans focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 shadow-md"
       />
     </div>
   );
