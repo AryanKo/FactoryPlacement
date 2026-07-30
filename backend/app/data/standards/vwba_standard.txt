@@ -1,0 +1,10 @@
+# Voluntary Water Balance Assessment (VWBA) Guidelines
+
+[VWBA §1.0: Volumetric Water Benefit Accounting]
+Facilities seeking volumetric water stewardship certification must implement quantifiable water replenishment projects within the local watershed. Eligible projects include wetland restoration, agricultural irrigation efficiency partnerships, and community rainwater harvesting infrastructure.
+
+[VWBA §2.0: Aquifer Replenishment & Artificial Recharge]
+Deep aquifer artificial recharge structures (e.g. injection wells, percolation tanks) shall be designed to recharge at least 120% of the site's annual un-recycled groundwater abstraction volume. Recharge water must meet drinking water quality parameters prior to infiltration.
+
+[VWBA §3.0: Rainwater Harvesting Metrics]
+Sites with roof area exceeding 5,000 square meters must install rainwater collection systems with storage capacity for at least a 50mm 24-hour storm event. Harvested water shall be prioritized for boiler feed, cooling tower makeup, or landscape irrigation.

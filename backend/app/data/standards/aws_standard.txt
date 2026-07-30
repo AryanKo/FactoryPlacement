@@ -1,0 +1,19 @@
+# AWS Water Stewardship Standard V2.0 Excerpts
+
+[AWS Standard §1.1: Governance and Commitment]
+The site leadership shall commit to responsible water stewardship by establishing a clear water balance policy. Facilities must maintain a public water stewardship plan that aligns with local catchment priorities and addresses identified shared water challenges.
+
+[AWS Standard §2.1: Site Water Balance Data]
+Facilities shall compute and maintain a monthly site water balance. The water balance must account for total water intake by source (surface water, groundwater, municipal, rainwater), internal water recycling volume, and total discharge by destination. Discrepancies exceeding 5% between intake and output must be investigated and documented.
+
+[AWS Standard §3.1: Sustainable Water Balance Directive]
+Facilities operating in water-stressed catchments must implement target reduction plans for net water consumption. Where surface water availability exhibits a negative 10-year trend exceeding 10%, the site shall reduce total freshwater intake by at least 15% within 24 months, prioritizing recycling and closed-loop process cooling.
+
+[AWS Standard §3.2: Flood Risk and Extreme Event Exposure]
+Sites located within 100-year flood zones or areas designated with moderate-to-high flood risk exposure shall construct perimeter flood barriers, elevate critical equipment above 1-in-100 year flood levels, and maintain emergency stormwater discharge capacity capable of handling peak runoff events.
+
+[AWS Standard §4.1: Water Quality and Effluent Standards]
+Discharged wastewater shall meet or exceed local regulatory standards and AWS baseline water quality parameters. Heavy metals, biological oxygen demand (BOD), and total dissolved solids (TDS) must be continuously monitored prior to discharge into public waterways or municipal treatment facilities.
+
+[AWS Standard §5.1: Catchment Health & Shared Governance]
+The site shall actively participate in local watershed management groups and collaborate with downstream water users to safeguard local groundwater aquifers and surface water bodies from depletion and contamination.

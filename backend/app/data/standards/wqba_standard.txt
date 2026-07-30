@@ -1,0 +1,13 @@
+# Water Quality & Balance Assessment (WQBA) Standards
+
+[WQBA §1.0: Baseline Water Quality Monitoring]
+Industrial facilities must establish baseline water quality metrics for all incoming raw water sources. Baseline monitoring includes testing for pH, electrical conductivity, chemical oxygen demand (COD), total suspended solids (TSS), and persistent organic pollutants on a bi-weekly sampling schedule.
+
+[WQBA §2.0: Heavy Metal & Chemical Discharge Limits]
+Effluent stream concentrations for lead (Pb), cadmium (Cd), chromium (Cr-VI), and arsenic (As) shall not exceed 0.05 mg/L, 0.005 mg/L, 0.05 mg/L, and 0.01 mg/L respectively. Continuous automated sensors must trigger emergency shutdown valves if discharge limits are breached.
+
+[WQBA §3.0: Groundwater Quality & Aquifer Protection]
+Sites extracting groundwater must monitor static water levels quarterly and test deep aquifer samples for salt-water intrusion or chemical leaching. Piezometric head drops exceeding 1.5 meters per year mandate immediate reduction in pumping rates by at least 20%.
+
+[WQBA §4.0: Seasonal Variance & Climate Stress Protocols]
+During dry season periods or drought alerts when local surface water trends drop below -15%, industrial sites must shift to emergency conservation mode, capping non-essential water usage and recycling at least 80% of process wash-water.
