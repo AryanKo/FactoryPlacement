@@ -311,8 +311,27 @@ def verify_claims(claims: List[Claim], payload: Optional[Dict[str, Any]]) -> Lis
 
 
 def clean_response(text: Optional[str], verified_claims: List[VerifiedClaim]) -> str:
-    """Format original response text keeping rejected claims visible with strike-through tags."""
-    return text or ""
+    """Format original response text keeping rejected claims visible with strike-through tags.
+
+    Format for rejected text:
+    ~~rejected claim~~ Removed — Unverifiable
+    """
+    if not text or not isinstance(text, str):
+        return ""
+
+    cleaned = text
+    rejected_claims = [v for v in verified_claims if not v.verified]
+
+    for v in rejected_claims:
+        target = v.claim.text if v.claim.text in cleaned else v.claim.original_sentence
+        if target and target in cleaned:
+            if f"~~{target}~~" in cleaned or "Removed — Unverifiable" in target:
+                continue
+            replacement = f"~~{target}~~ Removed — Unverifiable"
+            cleaned = cleaned.replace(target, replacement, 1)
+
+    return cleaned
+
 
 
 def compute_trust_score(claims_checked: int, claims_grounded: int) -> Dict[str, Any]:
