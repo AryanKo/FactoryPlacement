@@ -1,7 +1,10 @@
 import asyncio
 from pathlib import Path
 
-import ee
+try:
+    import ee
+except ImportError:
+    ee = None
 
 from app.core.config import BACKEND_DIR, PROJECT_ROOT, settings
 from app.core.logging import logger

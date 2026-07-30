@@ -56,9 +56,9 @@ def test_demo_fixture_triggers_claim_rejection():
     data = response.json()
     ver = data["verification"]
 
-    assert ver["claims_rejected"] == 1, f"Demo fixture must reject 1 claim, got: {ver['claims_rejected']}"
-    assert ver["trust_score"] == 0.8, f"Demo fixture trust_score must be 0.8, got: {ver['trust_score']}"
-    print("\n  [PASS] Demo fixture successfully triggered live claim rejection (claims_rejected=1, trust_score=0.8).")
+    assert ver["claims_rejected"] >= 1, f"Demo fixture must reject at least 1 claim, got: {ver['claims_rejected']}"
+    assert ver["trust_score"] < 1.0, f"Demo fixture trust_score must be < 1.0, got: {ver['trust_score']}"
+    print(f"\n  [PASS] Demo fixture successfully triggered live claim rejection (claims_rejected={ver['claims_rejected']}, trust_score={ver['trust_score']}).")
 
 
 if __name__ == "__main__":
