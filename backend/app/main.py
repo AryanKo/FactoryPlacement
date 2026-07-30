@@ -1,3 +1,8 @@
+"""
+AquaShield — FastAPI Main Entrypoint
+Mounts /api/risk (DevA) and /api/explain (DevB) routers with CORS and exception handlers.
+"""
+
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,12 +17,13 @@ from app.core.exceptions import (
     validation_exception_handler,
 )
 from app.routers import risk
+from app.routers import explain
 
-# Dev B / C Routers (to be uncommented when implemented)
-# from app.routers import explain
-# from app.routers import compare
-
-app = FastAPI(title=settings.app_name)
+app = FastAPI(
+    title=settings.app_name or "AquaShield API",
+    description="Grounded water-risk decision support with Gemma 4",
+    version="1.0.0"
+)
 
 # CORS middleware
 app.add_middleware(
@@ -42,14 +48,11 @@ async def generic_exception_handler(request, exc):  # noqa: ANN001
     )
 
 
-# --- DEV A ROUTERS ---
+# --- ROUTERS ---
 app.include_router(risk.router)
-
-# --- DEV B / C ROUTERS ---
-# app.include_router(explain.router)
-# app.include_router(compare.router)
+app.include_router(explain.router)
 
 
 @app.get("/health")
 async def health_check():
-    return {"status": "ok"}
+    return {"status": "ok", "service": "AquaShield API"}
