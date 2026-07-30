@@ -20,6 +20,13 @@ class IndicatorValue(BaseModel):
 class RiskIndicators(BaseModel):
     surface_water_trend: IndicatorValue
     flood_exposure: IndicatorValue
+    rainfall: IndicatorValue
+    elevation: IndicatorValue
+    slope: IndicatorValue
+    land_cover: IndicatorValue
+    vegetation_index: IndicatorValue
+    surface_temperature: IndicatorValue
+    distance_to_water: IndicatorValue
     rainfall_proxy: IndicatorValue
 
     model_config = ConfigDict(extra="forbid")
